@@ -1,0 +1,47 @@
+name: dot-ang-cicd
+
+on: 
+  push: 
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout code
+      uses: actions/checkout@v4.2.2
+
+    - name: Setup .NET Core SDK
+      uses: actions/setup-dotnet@v3.4.2
+      with:
+        dotnet-version: '5.0.x'
+
+    - name: dotnet restore
+      run: dotnet restore angular-dotnet-example.csproj
+
+    - name: dotnet build
+      run: dotnet build angular-dotnet-example.csproj --no-restore
+
+    - name: Setup Node.js 
+      uses: actions/setup-node@v3.9.1
+      with:
+        node-version: '14'
+
+    - name: Install angular dependencies
+      working-directory: ClientApp
+      run: npm ci
+
+    - name: build angular
+      working-directory: ClientApp
+      run: npm build 
+      
+    - name: dotnet publish
+      run: dotnet publish angular-dotnet-example.csproj -o publish
+
+    - name: upload build artifacts
+      uses: actions/upload-artifact@v4.6.2
+      with:
+        name: dot-ang-artifacts
+        path: publish/
+        
