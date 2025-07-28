@@ -33,9 +33,11 @@ jobs:
       with:
         node-version: '14'
 
-    - name: Install angular dependencies
+    - name: Clean and install Angular dependencies
       working-directory: ClientApp
-      run: npm ci
+      run: |
+        rm -rf node_modules package-lock.json
+        npm install
 
     - name: build angular
       working-directory: ClientApp
