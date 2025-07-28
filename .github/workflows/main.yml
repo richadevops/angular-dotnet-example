@@ -52,3 +52,32 @@ jobs:
         name: dot-ang-artifacts
         path: publish/
         
+  deploy:
+    name: deploy to VM
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: download artifacts
+      uses: actions/download-artifact@v4.3.0
+      with:
+        name: dot-ang-artifacts
+        path: ./publish
+
+    - name: deploy with WinRM
+      uses: mmsaeed509/winrm-action@v1
+      with:
+        host: ${{ secrets.WINRM_HOST }}
+        username: ${{ secrets.WINRM_USER }}
+        password: ${{ secrets.WINRM_PASSWORD }}
+        port: 5985
+        transport: http
+        commands: |
+          $path = "${{ secrets.DEPLOY_PATH }}"
+          if (!(Test-Path $path)) {
+            New-Item -ItemType Directory -Path $path -Force
+          }
+          Remove-Item "$path\*" -Recurse -Force -ErrorAction SilentlyContinue
+          Copy-Item -Path "${{ github.workspace }}\publish\*" -Destination $path -Recurse
+
+
+      
