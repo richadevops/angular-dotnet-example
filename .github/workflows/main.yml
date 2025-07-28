@@ -62,38 +62,38 @@ jobs:
       with:
         name: dot-ang-artifacts
         path: ./publish
-    - name: Enable Unencrypted WinRM Traffic
-      run: |
-       winrm quickconfig -force
-       winrm set winrm/config/client '@{AllowUnencrypted="true"}'
-       winrm set winrm/config/service '@{AllowUnencrypted="true"}'
-       winrm set winrm/config/service/auth '@{Basic="true"}'
-      shell: powershell
-     
-    - name: Deploy using PowerShell over WinRM
+
+    - name: 🚀 Deploy to IIS using WinRM
       shell: pwsh
       env:
         WINRM_HOST: ${{ secrets.WINRM_HOST }}
         WINRM_USER: ${{ secrets.WINRM_USER }}
-        WINRM_PASS: ${{ secrets.WINRM_PASSWORD }}
+        WINRM_PASS: ${{ secrets.WINRM_PASS }}
       run: |
-        $secpasswd = ConvertTo-SecureString $env:WINRM_PASS -AsPlainText -Force
-        $cred = New-Object System.Management.Automation.PSCredential ($env:WINRM_USER, $secpasswd)
-        $session = New-PSSession -ComputerName $env:WINRM_HOST -Credential $cred -Authentication basic -UseSSL:$false
+       Write-Host "🔐 Setting TrustedHosts for $env:WINRM_HOST"
+       Set-Item -Path WSMan:\localhost\Client\TrustedHosts -Value $env:WINRM_HOST -Force
 
-        Invoke-Command -Session $session -ScriptBlock {
-          $dest = "C:\inetpub\wwwroot\DotnetAngularApp"
-          if (-Not (Test-Path $dest)) { New-Item -ItemType Directory -Path $dest }
-          Remove-Item "$dest\*" -Recurse -Force -ErrorAction SilentlyContinue
-        }
+       $secpasswd = ConvertTo-SecureString $env:WINRM_PASS -AsPlainText -Force
+       $cred = New-Object System.Management.Automation.PSCredential ($env:WINRM_USER, $secpasswd)
 
-        Copy-Item -ToSession $session -Path "./publish/*" -Destination "C:\inetpub\wwwroot\angdotapp" -Recurse
-        Invoke-Command -Session $session -ScriptBlock {
-          Write-Output "✅ Deployed to IIS at $env:COMPUTERNAME"
-        }
+       Write-Host "🌐 Creating remote PowerShell session..."
+       $session = New-PSSession -ComputerName $env:WINRM_HOST -Credential $cred -Authentication Basic -UseSSL:$false
 
-        Remove-PSSession $session
-   
+       Write-Host "📂 Preparing destination directory..."
+       Invoke-Command -Session $session -ScriptBlock {
+         $dest = "C:\inetpub\wwwroot\DotnetAngularApp"
+         if (-Not (Test-Path $dest)) { 
+           New-Item -ItemType Directory -Path $dest -Force 
+         }
+         Remove-Item "$dest\*" -Recurse -Force -ErrorAction SilentlyContinue
+       }
 
+       Write-Host "📤 Copying published files..."
+       Copy-Item -ToSession $session -Path "./publish/*" -Destination "C:\inetpub\wwwroot\angdotapp" -Recurse
 
-      
+       Write-Host "✅ Final verification..."
+       Invoke-Command -Session $session -ScriptBlock {
+       Write-Output "✅ Deployed to IIS at $env:COMPUTERNAME"
+       }
+
+       Remove-PSSession $session
