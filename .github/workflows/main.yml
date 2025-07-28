@@ -67,7 +67,7 @@ jobs:
       shell: pwsh
       env:
         WINRM_HOST: ${{ secrets.WINRM_HOST }}
-        WINRM_USER: ${{ secrets.WINRM_USERNAME }}
+        WINRM_USER: ${{ secrets.WINRM_USER }}
         WINRM_PASS: ${{ secrets.WINRM_PASSWORD }}
       run: |
         $secpasswd = ConvertTo-SecureString $env:WINRM_PASS -AsPlainText -Force
