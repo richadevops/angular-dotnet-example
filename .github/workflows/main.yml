@@ -62,7 +62,14 @@ jobs:
       with:
         name: dot-ang-artifacts
         path: ./publish
-        
+    - name: Enable Unencrypted WinRM Traffic
+      run: |
+       winrm quickconfig -force
+       winrm set winrm/config/client '@{AllowUnencrypted="true"}'
+       winrm set winrm/config/service '@{AllowUnencrypted="true"}'
+       winrm set winrm/config/service/auth '@{Basic="true"}'
+      shell: powershell
+     
     - name: Deploy using PowerShell over WinRM
       shell: pwsh
       env:
