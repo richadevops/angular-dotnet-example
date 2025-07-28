@@ -55,7 +55,7 @@ jobs:
   deploy:
     name: deploy to VM
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
     - name: download artifacts
       uses: actions/download-artifact@v4.3.0
