@@ -63,21 +63,21 @@ jobs:
         name: dot-ang-artifacts
         path: ./publish
 
-    - name: deploy with WinRM
-      uses: mmsaeed509/winrm-action@v1
+    - name: Run PowerShell script on remote IIS VM
+      uses: gsoft-inc/actions-powershell@v1
       with:
         host: ${{ secrets.WINRM_HOST }}
-        username: ${{ secrets.WINRM_USER }}
+        username: ${{ secrets.WINRM_USERNAME }}
         password: ${{ secrets.WINRM_PASSWORD }}
-        port: 5985
-        transport: http
-        commands: |
-          $path = "${{ secrets.DEPLOY_PATH }}"
-          if (!(Test-Path $path)) {
-            New-Item -ItemType Directory -Path $path -Force
+        script: |
+          $publishPath = "C:\inetpub\wwwroot\angdotapp"
+          if (Test-Path $publishPath) {
+              Remove-Item "$publishPath\*" -Recurse -Force
+          } else {
+              New-Item -ItemType Directory -Path $publishPath
           }
-          Remove-Item "$path\*" -Recurse -Force -ErrorAction SilentlyContinue
-          Copy-Item -Path "${{ github.workspace }}\publish\*" -Destination $path -Recurse
+          Copy-Item -Path "${{ github.workspace }}\publish\*" -Destination $publishPath -Recurse -Force
+          Write-Output "✅ Deployment completed!"
 
 
       
