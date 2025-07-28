@@ -62,22 +62,31 @@ jobs:
       with:
         name: dot-ang-artifacts
         path: ./publish
+        
+    - name: Deploy using PowerShell over WinRM
+      shell: pwsh
+      env:
+        WINRM_HOST: ${{ secrets.WINRM_HOST }}
+        WINRM_USER: ${{ secrets.WINRM_USERNAME }}
+        WINRM_PASS: ${{ secrets.WINRM_PASSWORD }}
+      run: |
+        $secpasswd = ConvertTo-SecureString $env:WINRM_PASS -AsPlainText -Force
+        $cred = New-Object System.Management.Automation.PSCredential ($env:WINRM_USER, $secpasswd)
+        $session = New-PSSession -ComputerName $env:WINRM_HOST -Credential $cred -Authentication basic -UseSSL:$false
 
-    - name: Run PowerShell script on remote IIS VM
-      uses: gsoft-inc/actions-powershell@v1
-      with:
-        host: ${{ secrets.WINRM_HOST }}
-        username: ${{ secrets.WINRM_USERNAME }}
-        password: ${{ secrets.WINRM_PASSWORD }}
-        script: |
-          $publishPath = "C:\inetpub\wwwroot\angdotapp"
-          if (Test-Path $publishPath) {
-              Remove-Item "$publishPath\*" -Recurse -Force
-          } else {
-              New-Item -ItemType Directory -Path $publishPath
-          }
-          Copy-Item -Path "${{ github.workspace }}\publish\*" -Destination $publishPath -Recurse -Force
-          Write-Output "✅ Deployment completed!"
+        Invoke-Command -Session $session -ScriptBlock {
+          $dest = "C:\inetpub\wwwroot\DotnetAngularApp"
+          if (-Not (Test-Path $dest)) { New-Item -ItemType Directory -Path $dest }
+          Remove-Item "$dest\*" -Recurse -Force -ErrorAction SilentlyContinue
+        }
+
+        Copy-Item -ToSession $session -Path "./publish/*" -Destination "C:\inetpub\wwwroot\angdotapp" -Recurse
+        Invoke-Command -Session $session -ScriptBlock {
+          Write-Output "✅ Deployed to IIS at $env:COMPUTERNAME"
+        }
+
+        Remove-PSSession $session
+   
 
 
       
