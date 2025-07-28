@@ -68,7 +68,7 @@ jobs:
       env:
         WINRM_HOST: ${{ secrets.WINRM_HOST }}
         WINRM_USER: ${{ secrets.WINRM_USER }}
-        WINRM_PASS: ${{ secrets.WINRM_PASS }}
+        WINRM_PASS: ${{ secrets.WINRM_PASSWORD }}
       run: |
        Write-Host "🔐 Setting TrustedHosts for $env:WINRM_HOST"
        Set-Item -Path WSMan:\localhost\Client\TrustedHosts -Value $env:WINRM_HOST -Force
