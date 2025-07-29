@@ -63,16 +63,20 @@ jobs:
         name: dot-ang-artifacts
         path: ./publish
 
-    - name: 🚀 Deploy to IIS using WinRM
+    - name: 🔄 Deploy to IIS via WinRM
       shell: pwsh
       env:
-        WINRM_HOST: ${{ secrets.WINRM_HOST }}
-        WINRM_USER: ${{ secrets.WINRM_USER }}
-        WINRM_PASS: ${{ secrets.WINRM_PASSWORD }}
+       WINRM_HOST: ${{ secrets.WINRM_HOST }}
+       WINRM_USER: ${{ secrets.WINRM_USER }}
+       WINRM_PASS: ${{ secrets.WINRM_PASSWORD }}
       run: |
        Write-Host "🔐 Setting TrustedHosts for $env:WINRM_HOST"
        Set-Item -Path WSMan:\localhost\Client\TrustedHosts -Value $env:WINRM_HOST -Force
 
+       Write-Host "🔓 Allowing unencrypted traffic..."
+       Set-Item -Path WSMan:\localhost\Client\AllowUnencrypted -Value $true -Force
+
+       Write-Host "🔑 Creating credentials..."
        $secpasswd = ConvertTo-SecureString $env:WINRM_PASS -AsPlainText -Force
        $cred = New-Object System.Management.Automation.PSCredential ($env:WINRM_USER, $secpasswd)
 
@@ -82,18 +86,20 @@ jobs:
        Write-Host "📂 Preparing destination directory..."
        Invoke-Command -Session $session -ScriptBlock {
          $dest = "C:\inetpub\wwwroot\DotnetAngularApp"
-         if (-Not (Test-Path $dest)) { 
-           New-Item -ItemType Directory -Path $dest -Force 
-         }
+         if (-Not (Test-Path $dest)) {
+           New-Item -ItemType Directory -Path $dest -Force
+        }
          Remove-Item "$dest\*" -Recurse -Force -ErrorAction SilentlyContinue
        }
 
        Write-Host "📤 Copying published files..."
-       Copy-Item -ToSession $session -Path "./publish/*" -Destination "C:\inetpub\wwwroot\angdotapp" -Recurse
+       Copy-Item -ToSession $session -Path "./publish/*" -Destination "C:\inetpub\wwwroot\DotnetAngularApp" -Recurse
 
        Write-Host "✅ Final verification..."
        Invoke-Command -Session $session -ScriptBlock {
-       Write-Output "✅ Deployed to IIS at $env:COMPUTERNAME"
+         Write-Output "✅ Deployed to IIS at $env:COMPUTERNAME"
        }
 
+       Write-Host "🧹 Removing session..."
        Remove-PSSession $session
+
