@@ -70,10 +70,13 @@ jobs:
           WINRM_USER: ${{ secrets.WINRMUSER }}
           WINRM_PASS: ${{ secrets.WINRMPASS }}
       run: |
-       Write-Host "🔓 Enabling unencrypted traffic for WinRM client..."
+       Write-Host "🛠 Allowing unencrypted traffic..."
        Set-Item -Path WSMan:\localhost\Client\AllowUnencrypted -Value $true -Force
 
-       Write-Host "🔐 Setting up secure credentials..."
+       Write-Host "✅ Adding $env:WINRM_HOST to TrustedHosts..."
+       Set-Item -Path WSMan:\localhost\Client\TrustedHosts -Value $env:WINRM_HOST -Force
+
+       Write-Host "🔐 Creating credentials..."
        $securePassword = ConvertTo-SecureString $env:WINRM_PASS -AsPlainText -Force
        $credential = New-Object System.Management.Automation.PSCredential ($env:WINRM_USER, $securePassword)
 
@@ -82,7 +85,7 @@ jobs:
 
        $remotePath = "C:\inetpub\wwwroot\angdotapp"
 
-       Write-Host "📂 Preparing remote directory..."
+       Write-Host "📂 Cleaning previous deployment..."
        Invoke-Command -Session $session -ScriptBlock {
          param ($path)
          if (-Not (Test-Path $path)) {
@@ -91,9 +94,9 @@ jobs:
          Remove-Item "$path\*" -Recurse -Force -ErrorAction SilentlyContinue
        } -ArgumentList $remotePath
 
-       Write-Host "📤 Copying files to remote IIS path..."
+       Write-Host "📤 Copying files to IIS folder..."
        Copy-Item -Path "./publish/*" -Destination $remotePath -Recurse -ToSession $session
 
-       Write-Host "✅ Deployment successful!"
+       Write-Host "✅ Deployed to IIS successfully."
        Remove-PSSession $session
 
