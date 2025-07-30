@@ -63,43 +63,28 @@ jobs:
         name: dot-ang-artifacts
         path: ./publish
 
-    - name: Deploy to IIS via WinRM
-      shell: pwsh
-      env:
-       WINRM_HOST: ${{ secrets.WINRMHOST }}
-       WINRM_USER: ${{ secrets.WINRMUSER }}  # should be 'richa-devops\\richa'
-       WINRM_PASS: ${{ secrets.WINRMPASS }}
-      run: |
-       Write-Host "🔐 Setting TrustedHosts for $env:WINRM_HOST"
-       Set-Item -Path WSMan:\localhost\Client\TrustedHosts -Value $env:WINRM_HOST -Force
+    - name: Use PSRP to copy and deploy
+      uses: powervs/psrp@v1
+      with:
+          hostname: ${{ secrets.WINRMHOST }}
+          username: 'richa-devops\\richa'
+          password: ${{ secrets.WINRMPASS }}
+          port: 5985
+          transport: http
+          script: |
+            $localPath = "${{ github.workspace }}\publish"
+            $remotePath = "C:\inetpub\wwwroot\angdotapp"
 
-       Write-Host "🔓 Allowing unencrypted traffic..."
-       Set-Item -Path WSMan:\localhost\Client\AllowUnencrypted -Value $true -Force
+            # Create directory if not exists
+            if (-Not (Test-Path $remotePath)) {
+              New-Item -ItemType Directory -Path $remotePath -Force
+            }
 
-       Write-Host "🔑 Creating credentials..."
-       $secpasswd = ConvertTo-SecureString $env:WINRM_PASS -AsPlainText -Force
-       $cred = New-Object System.Management.Automation.PSCredential ($env:WINRM_USER, $secpasswd)
+            # Remove existing files
+            Remove-Item "$remotePath\*" -Recurse -Force -ErrorAction SilentlyContinue
 
-       Write-Host "🌐 Creating remote PowerShell session..."
-       $session = New-PSSession -ComputerName $env:WINRM_HOST -Credential $cred -Authentication Basic
+            # Copy files from GitHub workspace to remote IIS folder
+            robocopy $localPath $remotePath /MIR
 
-       Write-Host "📂 Preparing destination directory on remote IIS..."
-       Invoke-Command -Session $session -ScriptBlock {
-        $dest = "C:\inetpub\wwwroot\angdotapp"
-         if (-Not (Test-Path $dest)) {
-           New-Item -ItemType Directory -Path $dest -Force
-         }
-         Remove-Item "$dest\*" -Recurse -Force -ErrorAction SilentlyContinue
-       }
-
-       Write-Host "📤 Copying published files to IIS folder..."
-       Copy-Item -ToSession $session -Path "./publish/*" -Destination "C:\inetpub\wwwroot\angdotapp" -Recurse
-
-       Write-Host "✅ Final verification on remote VM..."
-       Invoke-Command -Session $session -ScriptBlock {
-         Write-Output "✅ Deployed to IIS on $env:COMPUTERNAME"
-       }
-
-       Write-Host "🧹 Removing session..."
-       Remove-PSSession $session
+            Write-Host "✅ Deployment complete."
 
