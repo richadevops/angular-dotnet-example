@@ -70,27 +70,30 @@ jobs:
           WINRM_USER: ${{ secrets.WINRMUSER }}
           WINRM_PASS: ${{ secrets.WINRMPASS }}
       run: |
-          Write-Host "Setting up secure credentials..."
-          $securePassword = ConvertTo-SecureString $env:WINRM_PASS -AsPlainText -Force
-          $credential = New-Object System.Management.Automation.PSCredential ($env:WINRM_USER, $securePassword)
+       Write-Host "🔓 Enabling unencrypted traffic for WinRM client..."
+       Set-Item -Path WSMan:\localhost\Client\AllowUnencrypted -Value $true -Force
 
-          Write-Host "Creating remote session..."
-          $session = New-PSSession -ComputerName $env:WINRM_HOST -Credential $credential -Authentication Basic
+       Write-Host "🔐 Setting up secure credentials..."
+       $securePassword = ConvertTo-SecureString $env:WINRM_PASS -AsPlainText -Force
+       $credential = New-Object System.Management.Automation.PSCredential ($env:WINRM_USER, $securePassword)
 
-          $remotePath = "C:\inetpub\wwwroot\angdotapp"
+       Write-Host "🌐 Creating remote session..."
+       $session = New-PSSession -ComputerName $env:WINRM_HOST -Credential $credential -Authentication Basic
 
-          Write-Host "Creating directory and cleaning previous deployment..."
-          Invoke-Command -Session $session -ScriptBlock {
-            param ($path)
-            if (-Not (Test-Path $path)) {
-              New-Item -ItemType Directory -Path $path -Force
-            }
-            Remove-Item "$path\*" -Recurse -Force -ErrorAction SilentlyContinue
-          } -ArgumentList $remotePath
+       $remotePath = "C:\inetpub\wwwroot\angdotapp"
 
-          Write-Host "Copying files to remote IIS path..."
-          Copy-Item -Path "./publish/*" -Destination $remotePath -Recurse -ToSession $session
+       Write-Host "📂 Preparing remote directory..."
+       Invoke-Command -Session $session -ScriptBlock {
+         param ($path)
+         if (-Not (Test-Path $path)) {
+           New-Item -ItemType Directory -Path $path -Force
+         }
+         Remove-Item "$path\*" -Recurse -Force -ErrorAction SilentlyContinue
+       } -ArgumentList $remotePath
 
-          Write-Host "Deployment successful!"
-          Remove-PSSession $session
+       Write-Host "📤 Copying files to remote IIS path..."
+       Copy-Item -Path "./publish/*" -Destination $remotePath -Recurse -ToSession $session
+
+       Write-Host "✅ Deployment successful!"
+       Remove-PSSession $session
 
