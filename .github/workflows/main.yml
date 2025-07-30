@@ -63,28 +63,34 @@ jobs:
         name: dot-ang-artifacts
         path: ./publish
 
-    - name: Use PSRP to copy and deploy
-      uses: powervs/psrp@v1
-      with:
-          hostname: ${{ secrets.WINRMHOST }}
-          username: 'richa-devops\\richa'
-          password: ${{ secrets.WINRMPASS }}
-          port: 5985
-          transport: http
-          script: |
-            $localPath = "${{ github.workspace }}\publish"
-            $remotePath = "C:\inetpub\wwwroot\angdotapp"
+    - name: Deploy to IIS via PowerShell WinRM
+      shell: pwsh
+      env:
+          WINRM_HOST: ${{ secrets.WINRMHOST }}
+          WINRM_USER: ${{ secrets.WINRMUSER }}
+          WINRM_PASS: ${{ secrets.WINRMPASS }}
+      run: |
+          Write-Host "Setting up secure credentials..."
+          $securePassword = ConvertTo-SecureString $env:WINRM_PASS -AsPlainText -Force
+          $credential = New-Object System.Management.Automation.PSCredential ($env:WINRM_USER, $securePassword)
 
-            # Create directory if not exists
-            if (-Not (Test-Path $remotePath)) {
-              New-Item -ItemType Directory -Path $remotePath -Force
+          Write-Host "Creating remote session..."
+          $session = New-PSSession -ComputerName $env:WINRM_HOST -Credential $credential -Authentication Basic
+
+          $remotePath = "C:\inetpub\wwwroot\angdotapp"
+
+          Write-Host "Creating directory and cleaning previous deployment..."
+          Invoke-Command -Session $session -ScriptBlock {
+            param ($path)
+            if (-Not (Test-Path $path)) {
+              New-Item -ItemType Directory -Path $path -Force
             }
+            Remove-Item "$path\*" -Recurse -Force -ErrorAction SilentlyContinue
+          } -ArgumentList $remotePath
 
-            # Remove existing files
-            Remove-Item "$remotePath\*" -Recurse -Force -ErrorAction SilentlyContinue
+          Write-Host "Copying files to remote IIS path..."
+          Copy-Item -Path "./publish/*" -Destination $remotePath -Recurse -ToSession $session
 
-            # Copy files from GitHub workspace to remote IIS folder
-            robocopy $localPath $remotePath /MIR
-
-            Write-Host "✅ Deployment complete."
+          Write-Host "Deployment successful!"
+          Remove-PSSession $session
 
