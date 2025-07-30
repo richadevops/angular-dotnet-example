@@ -67,7 +67,7 @@ jobs:
       shell: pwsh
       env:
        WINRM_HOST: ${{ secrets.WINRMHOST }}
-       WINRM_USER: ${{ secrets.WINRMUSER }}
+       WINRM_USER: ${{ secrets.WINRMUSER }}  # should be 'richa-devops\\richa'
        WINRM_PASS: ${{ secrets.WINRMPASS }}
       run: |
        Write-Host "🔐 Setting TrustedHosts for $env:WINRM_HOST"
@@ -85,7 +85,7 @@ jobs:
 
        Write-Host "📂 Preparing destination directory on remote IIS..."
        Invoke-Command -Session $session -ScriptBlock {
-         $dest = "C:\inetpub\wwwroot\angdotapp"
+        $dest = "C:\inetpub\wwwroot\angdotapp"
          if (-Not (Test-Path $dest)) {
            New-Item -ItemType Directory -Path $dest -Force
          }
