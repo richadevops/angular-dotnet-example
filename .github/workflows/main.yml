@@ -51,3 +51,25 @@ jobs:
         name: dot-ang-artifacts
         path: publish/
         
+  deploy:
+    needs: build
+    runs-on: [self-hosted, Windows]
+    steps:
+    - name: download artifacts
+      uses: actions/download-artifact@v4.1.7
+      with:
+          name: dot-ang-artifacts
+          path: publish
+
+    - name: deploy to IIS
+      run: |
+          $source = "$(Get-Location)\deploy"
+          $destination = "C:\inetpub\wwwroot\dotang"
+          if (Test-Path $destination) {
+            Remove-Item "$destination\*" -Recurse -Force
+          } else {
+            New-Item -Path $destination -ItemType Directory
+          }
+          Copy-Item "$source\*" -Destination $destination -Recurse -Force
+          shell: pwsh
+
