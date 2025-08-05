@@ -53,23 +53,56 @@ jobs:
         
   deploy:
     needs: build
-    runs-on: [self-hosted, Windows, X64]
+    runs-on: windows-latest
     steps:
-    - name: download artifacts
+    - name: Download build artifacts
       uses: actions/download-artifact@v4.1.7
       with:
-          name: dot-ang-artifacts
-          path: publish
+        name: dot-ang-artifacts
+        path: publish
 
-    - name: deploy to IIS
-      shell: pwsh
+    - name: Install PSRemoting module
       run: |
-        $source = "$(Get-Location)\publish"
-        $destination = "C:\inetpub\wwwroot\dotang"
-        if (Test-Path $destination) {
-          Remove-Item "$destination\*" -Recurse -Force
-        } else {
-          New-Item -Path $destination -ItemType Directory
-        }
-        Copy-Item "$source\*" -Destination $destination -Recurse -Force
+        Install-Module -Name PSRemoting -Force -Scope CurrentUser
+      shell: pwsh
 
+    - name: Deploy to remote IIS via WinRM
+      shell: pwsh
+      env:
+        WINRM_HOST: ${{ secrets.WINRM_HOST }}
+        WINRM_USER: ${{ secrets.WINRM_USER }}
+        WINRM_PASS: ${{ secrets.WINRM_PASS }}
+      run: |
+        $username = $env:WINRM_USER
+        $password = ConvertTo-SecureString $env:WINRM_PASS -AsPlainText -Force
+        $cred = New-Object System.Management.Automation.PSCredential ($username, $password)
+
+        $session = New-PSSession -ComputerName $env:WINRM_HOST -Credential $cred -Authentication Basic -UseSSL:$false
+
+        Invoke-Command -Session $session -ScriptBlock {
+          $siteName = "dot-ang-site"
+          $port = 8085
+          $physicalPath = "C:\inetpub\$siteName"
+
+          if (!(Test-Path $physicalPath)) {
+            New-Item -Path $physicalPath -ItemType Directory -Force
+          }
+
+          Write-Output "Cleaning old site files..."
+          Get-ChildItem -Path $physicalPath -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+          Write-Output "Creating new IIS site if not exists..."
+          Import-Module WebAdministration
+          if (-Not (Get-Website | Where-Object { $_.Name -eq $siteName })) {
+            New-Website -Name $siteName -Port $port -PhysicalPath $physicalPath -Force
+          } else {
+            Restart-WebAppPool -Name "$siteName"
+          }
+        }
+
+        Write-Output "Copying files to remote..."
+        Copy-Item -Path ".\publish\*" -Destination "\\$env:WINRM_HOST\C$\inetpub\dot-ang-site\" -Recurse -Force -Credential $cred
+
+        Write-Output "Deployment completed successfully."
+
+        Remove-PSSession -Session $session
