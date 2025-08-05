@@ -72,8 +72,14 @@ jobs:
         $password = ConvertTo-SecureString $env:WINRM_PASS -AsPlainText -Force
         $cred = New-Object System.Management.Automation.PSCredential ($username, $password)
 
+        # 🔥 Fix: Allow unencrypted + trust the host
+        Set-Item -Path WSMan:\localhost\Client\AllowUnencrypted -Value $true
+        Set-Item -Path WSMan:\localhost\Client\TrustedHosts -Value $env:WINRM_HOST -Force
+
+        # Connect to remote machine
         $session = New-PSSession -ComputerName $env:WINRM_HOST -Credential $cred -Authentication Basic -UseSSL:$false
 
+        # Deploy to IIS
         Invoke-Command -Session $session -ScriptBlock {
           $siteName = "dot-ang-site"
           $port = 8085
@@ -83,7 +89,7 @@ jobs:
             New-Item -Path $physicalPath -ItemType Directory -Force
           }
 
-          # Clean existing files
+          # Clean site folder
           Get-ChildItem -Path $physicalPath -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
           Import-Module WebAdministration
@@ -95,7 +101,8 @@ jobs:
           }
         }
 
-        # Copy published files to remote IIS folder using SMB
+        # Copy files via SMB
         Copy-Item -Path ".\publish\*" -Destination "\\$env:WINRM_HOST\C$\inetpub\dot-ang-site" -Recurse -Force -Credential $cred
 
+        # Close session
         Remove-PSSession -Session $session
