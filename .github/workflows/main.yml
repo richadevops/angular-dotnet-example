@@ -72,28 +72,25 @@ jobs:
         $password = ConvertTo-SecureString $env:WINRM_PASS -AsPlainText -Force
         $cred = New-Object System.Management.Automation.PSCredential ($username, $password)
 
-        # 🔥 Fix: Allow unencrypted + trust the host
         Set-Item -Path WSMan:\localhost\Client\AllowUnencrypted -Value $true
         Set-Item -Path WSMan:\localhost\Client\TrustedHosts -Value $env:WINRM_HOST -Force
 
-        # Connect to remote machine
-        $session = New-PSSession -ComputerName $env:WINRM_HOST -Credential $cred -Authentication Basic -UseSSL:$false
+        $session = New-PSSession -ComputerName $env:WINRM_HOST -Credential $cred -Authentication Basic
 
-        # Deploy to IIS
+        # Create IIS folder and clean old files
         Invoke-Command -Session $session -ScriptBlock {
           $siteName = "dot-ang-site"
           $port = 8085
           $physicalPath = "C:\inetpub\$siteName"
-
+          
           if (!(Test-Path $physicalPath)) {
             New-Item -Path $physicalPath -ItemType Directory -Force
           }
 
-          # Clean site folder
           Get-ChildItem -Path $physicalPath -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
           Import-Module WebAdministration
-
+          
           if (-Not (Get-Website | Where-Object { $_.Name -eq $siteName })) {
             New-Website -Name $siteName -Port $port -PhysicalPath $physicalPath -Force
           } else {
@@ -101,8 +98,8 @@ jobs:
           }
         }
 
-        # Copy files via SMB
-        Copy-Item -Path ".\publish\*" -Destination "\\$env:WINRM_HOST\C$\inetpub\dot-ang-site" -Recurse -Force -Credential $cred
+        # Copy files to remote machine using PowerShell session
+        Copy-Item -Path ".\publish\*" -Destination "C:\inetpub\dot-ang-site" -Recurse -Force -ToSession $session
 
-        # Close session
+        # Clean up
         Remove-PSSession -Session $session
