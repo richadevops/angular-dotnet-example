@@ -61,11 +61,6 @@ jobs:
         name: dot-ang-artifacts
         path: publish
 
-    - name: Install PSRemoting module
-      run: |
-        Install-Module -Name PSRemoting -Force -Scope CurrentUser
-      shell: pwsh
-
     - name: Deploy to remote IIS via WinRM
       shell: pwsh
       env:
@@ -88,21 +83,19 @@ jobs:
             New-Item -Path $physicalPath -ItemType Directory -Force
           }
 
-          Write-Output "Cleaning old site files..."
+          # Clean existing files
           Get-ChildItem -Path $physicalPath -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
-          Write-Output "Creating new IIS site if not exists..."
           Import-Module WebAdministration
+
           if (-Not (Get-Website | Where-Object { $_.Name -eq $siteName })) {
             New-Website -Name $siteName -Port $port -PhysicalPath $physicalPath -Force
           } else {
-            Restart-WebAppPool -Name "$siteName"
+            Restart-WebAppPool -Name $siteName
           }
         }
 
-        Write-Output "Copying files to remote..."
-        Copy-Item -Path ".\publish\*" -Destination "\\$env:WINRM_HOST\C$\inetpub\dot-ang-site\" -Recurse -Force -Credential $cred
-
-        Write-Output "Deployment completed successfully."
+        # Copy published files to remote IIS folder using SMB
+        Copy-Item -Path ".\publish\*" -Destination "\\$env:WINRM_HOST\C$\inetpub\dot-ang-site" -Recurse -Force -Credential $cred
 
         Remove-PSSession -Session $session
