@@ -62,14 +62,14 @@ jobs:
           path: publish
 
     - name: deploy to IIS
+      shell: pwsh
       run: |
-          $source = "$(Get-Location)\deploy"
-          $destination = "C:\inetpub\wwwroot\dotang"
-          if (Test-Path $destination) {
-            Remove-Item "$destination\*" -Recurse -Force
-          } else {
-            New-Item -Path $destination -ItemType Directory
-          }
-          Copy-Item "$source\*" -Destination $destination -Recurse -Force
-          shell: pwsh
+        $source = "$(Get-Location)\publish"
+        $destination = "C:\inetpub\wwwroot\dotang"
+        if (Test-Path $destination) {
+          Remove-Item "$destination\*" -Recurse -Force
+        } else {
+          New-Item -Path $destination -ItemType Directory
+        }
+        Copy-Item "$source\*" -Destination $destination -Recurse -Force
 
