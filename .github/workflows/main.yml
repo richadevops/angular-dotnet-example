@@ -1,0 +1,53 @@
+name: dot-ang-cicd
+
+on: 
+  push: 
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: checkout code
+      uses: actions/checkout@v4.2.2
+      
+    - name: Install libssl1.1 for .NET 5 compatibility
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libssl1.1
+        
+    - name: Setup .NET Core SDK
+      uses: actions/setup-dotnet@v3.4.2
+      with:
+        dotnet-version: '5.0.x'
+
+    - name: dotnet restore
+      run: dotnet restore angular-dotnet-example.csproj
+
+    - name: dotnet build
+      run: dotnet build angular-dotnet-example.csproj --no-restore
+
+    - name: Setup Node.js 
+      uses: actions/setup-node@v3.9.1
+      with:
+        node-version: '14'
+
+    - name: Clean and install Angular dependencies
+      working-directory: ClientApp
+      run: |
+        rm -rf node_modules package-lock.json
+        npm install
+    - name: build angular
+      working-directory: ClientApp
+      run: npm run build 
+      
+    - name: dotnet publish
+      run: dotnet publish angular-dotnet-example.csproj -o publish
+
+    - name: upload build artifacts
+      uses: actions/upload-artifact@v4.6.2
+      with:
+        name: dot-ang-artifacts
+        path: publish/
+        
